@@ -114,14 +114,6 @@ if(wdurl.isEmpty())
 		];
 
 		/* upload the downloaded file from CRM attachments to workdrive */
-		// 		uploadToWd = invokeurl
-		// 		[
-		// 			url :"https://workdrive.zoho.com/api/v1/upload?filename=" + att.get("File_Name") + "&parent_id=" + newFolderId
-		// 			type :POST
-		// 			connection:"zworkdrive"
-		// 			files:downAtt
-		// 		];
-		/* replacing upload api from REST to Deluge */ 
 		uploadToWd = zoho.workdrive.uploadFile(downAtt,newFolderId,fileName,true,"zworkdrive");
 		info uploadToWd;
 		
@@ -158,14 +150,6 @@ else
 		info downAtt;
 
 		/* upload the downloaded file from CRM attachments to workdrive */
-		// 		uploadToWd = invokeurl
-		// 		[
-		// 			url :"https://workdrive.zoho.com/api/v1/upload?filename=" + fileName + "&parent_id=" + wdfolderId
-		// 			type :POST
-		// 			files:downAtt
-		// 			connection:"zworkdrive"
-		// 		];
-		/* replacing upload api from REST to Deluge */ 
 		uploadToWd = zoho.workdrive.uploadFile(downAtt,wdfolderId,fileName,true,"zworkdrive");
 		info uploadToWd;
 		
