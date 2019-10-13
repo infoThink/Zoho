@@ -1,0 +1,184 @@
+/**
+ *
+ * Refer documentation: Zoho CRM and Workdrive Integration
+ * https://learn.zoho.com/portal/infothink/team/zoho-development/manual/zoho-crm-customisation/article/transfer-files-to-workdrive
+ * 
+ * Description: Script is executed from Zoho CRM when user clicks the button in the contact
+ *              view. It looks up the account record of a contact and check if the Workdrive
+ *              URL. If wdURL does not exist, create a new folder in team folder and update
+ *              the account record. It will also get the account owner (CRM User) email address
+ *              and assign sharing permission. If wdURL exists, get the folder ID and run the 
+ *              following sciprt. Download all attachments of the Contact record, upload to
+ *              workdirve, delete attachments from the CRM Contact record.
+ *
+ * Prerequisites: OAuth connection 1)zworkdrive 2)zcrm
+ *                Custom field 1)wdURL
+ *
+ * Version v2.0
+ *
+ * @category 
+ * @owner    Director, infoThink Solutions Pty Ltd
+ * @author   Daniel CHENG <d.cheng@infothink.com.au>, Vighnesh S <vighnesh.s@zohocorp.com>
+ * @wiki     https://learn.zoho.com/portal/infothink/
+ *           https://www.zoho.com/developer/help/scripting/
+ *
+ */
+
+/* getting contact id from the CRM contact module */
+getCont = zoho.crm.getRecordById("Contacts",contId);
+
+/* getting associated accont id from the contact record */
+acctId = getCont.get("Account_Name").get("id");
+
+/* getting associated user/owner id from the contact record */
+contOwnerId = getCont.get("Owner").get("id");
+// info contOwnerId;
+
+/* get all active CRM users details */
+/* https://www.zoho.com/crm/developer/docs/api/get-users.html */
+paramUser = {"type":"ActiveUsers"};
+getUser = invokeurl
+[
+	url :"https://www.zohoapis.com/crm/v2/users"
+	type :GET
+	parameters:paramUser.toString()
+	connection:"zcrm"
+];
+
+/* storing all active CRM users into a JSON list */
+userList = getUser.get("users").toJSONList();
+
+/* getting user email out from the JSON list by user id */
+for each  user in userList
+{
+	eachUser = user.toMap();
+	// info eachUser.get("id");
+	if(contOwnerId == eachUser.get("id"))
+	{
+		userEmail = eachUser.get("email");
+	}
+}
+// info userEmail;
+
+/* fetch the account record using the account id */
+getAcct = zoho.crm.getRecordById("Accounts",acctId);
+
+/* check if the wdURL field in account module is empty, if is null assign empty space to the field - prevent null error */
+wdurl = ifnull(getAcct.get("wdURL")," ");
+
+/* hard coding workdrive team folder ID - get from the workdrive URL /ws/ parameter. Save another API call. */
+orgid = "**********************************";
+teamid = ""**********************************";";
+
+/* get Company Name and ID */
+fullname = getAcct.get("Account_Number") + " " + getAcct.get("Account_Name");
+
+/* below is to check if the record is newly created */
+/* if wdURL field is empty - newly created, create a folder */
+if(wdurl.isEmpty())
+{
+	param = {"data":{"attributes":{"name":fullname,"parent_id":teamid},"type":"files"}};
+	createFolder = invokeurl
+	[
+		url :"https://workdrive.zoho.com/api/v1/files"
+		type :POST
+		parameters:param.toString()
+		headers:{"Accept":"application/vnd.api+json"}
+		connection:"zworkdrive"
+	];
+	info createFolder;
+	newFolderId = createFolder.get("data").get("id");
+	info zoho.crm.updateRecord("Accounts",acctId,{"wdURL":"https://workdrive.zoho.com/home/teams/" + orgid + "/ws/" + teamid + "/folders/" + newFolderId});
+	getAtt = zoho.crm.getRelatedRecords("Attachments","Contacts",contId);
+	for each  att in getAtt
+	{
+		downAtt = invokeurl
+		[
+			url :"https://www.zohoapis.com/crm/v2/Contacts/" + contId + "/Attachments/" + att.get("id")
+			type :GET
+			connection:"zcrm"
+		];
+		info downAtt;
+		fileName = att.get("File_Name");
+
+		/* REST API share the workdrive team foler with the contact record owner */ 
+		paramShareFolder = {"data":{"attributes":{"resource_id":newFolderId,"shared_type":"personal","email_id":userEmail,"role_id":"7","send_notification_mail":"true"},"type":"permissions"}};
+		shareFolder = invokeurl
+		[
+			url :"https://workdrive.zoho.com/api/v1/permissions"
+			type :POST
+			parameters:paramShareFolder.toString()
+			headers:{"Accept":"application/vnd.api+json"}
+			connection:"zworkdrive"
+		];
+
+		/* upload the downloaded file from CRM attachments to workdrive */
+		// 		uploadToWd = invokeurl
+		// 		[
+		// 			url :"https://workdrive.zoho.com/api/v1/upload?filename=" + att.get("File_Name") + "&parent_id=" + newFolderId
+		// 			type :POST
+		// 			connection:"zworkdrive"
+		// 			files:downAtt
+		// 		];
+		/* replacing upload api from REST to Deluge */ 
+		uploadToWd = zoho.workdrive.uploadFile(downAtt,newFolderId,fileName,true,"zworkdrive");
+		info uploadToWd;
+		
+		/* If the upload API call did not return any error, delete the files from the attachment list in CRM */
+		if(uploadToWd.notContains("error"))
+		{
+			deleteAtt = invokeurl
+			[
+				url :"https://www.zohoapis.com/crm/v2/Contacts/" + contId + "/Attachments/" + att.get("id")
+				type :DELETE
+				connection:"zcrm"
+			];
+			info deleteAtt;
+		}
+	}
+}
+else
+{
+	/* if not newly created, look for the folder */
+	wdfolderId = wdurl.toString().getSuffix("folders/");
+
+	/* getting the attachment lsit of the associated contact record */
+	getAtt = zoho.crm.getRelatedRecords("Attachments","Contacts",contId);
+	for each  att in getAtt
+	{
+		/* download attachments */
+		downAtt = invokeurl
+		[
+			url :"https://www.zohoapis.com/crm/v2/Contacts/" + contId + "/Attachments/" + att.get("id")
+			type :GET
+			connection:"zcrm"
+		];
+		fileName = att.get("File_Name");
+		info downAtt;
+
+		/* upload the downloaded file from CRM attachments to workdrive */
+		// 		uploadToWd = invokeurl
+		// 		[
+		// 			url :"https://workdrive.zoho.com/api/v1/upload?filename=" + fileName + "&parent_id=" + wdfolderId
+		// 			type :POST
+		// 			files:downAtt
+		// 			connection:"zworkdrive"
+		// 		];
+		/* replacing upload api from REST to Deluge */ 
+		uploadToWd = zoho.workdrive.uploadFile(downAtt,wdfolderId,fileName,true,"zworkdrive");
+		info uploadToWd;
+		
+		/* If the upload API call did not return any error, delete the files from the attachment list in CRM */
+		if(uploadToWd.notContains("error"))
+		{
+			deleteAtt = invokeurl
+			[
+				url :"https://www.zohoapis.com/crm/v2/Contacts/" + contId + "/Attachments/" + att.get("id")
+				type :DELETE
+				connection:"zcrm"
+			];
+			info deleteAtt;
+		}
+	}
+}
+return "";
