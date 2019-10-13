@@ -1,7 +1,7 @@
 /**
  *
  * Refer documentation: Zoho CRM and Workdrive Integration
- * https://learn.zoho.com/portal/infothink/team/zoho-development/manual/zoho-crm-customisation/article/transfer-files-to-workdrive
+ * 
  * 
  * Description: Script is executed from Zoho CRM when user clicks the button in the contact
  *              view. It looks up the account record of a contact and check if the Workdrive
@@ -21,6 +21,7 @@
  * @author   Daniel CHENG <d.cheng@infothink.com.au>, Vighnesh S <vighnesh.s@zohocorp.com>
  * @wiki     https://learn.zoho.com/portal/infothink/
  *           https://www.zoho.com/developer/help/scripting/
+ *           https://github.com/infoThink/Zoho/wiki
  *
  */
 
