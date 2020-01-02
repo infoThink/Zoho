@@ -1,0 +1,7 @@
+getContactRolesId = invokeUrl
+[
+url: "https://www.zohoapis.com/crm/v2/Contacts/roles"
+type: GET
+connection: "zcrm"
+];
+info getContactRolesId;
