@@ -1,0 +1,10 @@
+if(!input.Start_Time.matches("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"))
+{
+	alert "Not a valid time format for Start Time field";
+	cancel submit;
+}
+if(!input.End_Time.matches("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"))
+{
+	alert "Not a valid time format for End Time field";
+	cancel submit;
+}
